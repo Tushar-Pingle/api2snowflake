@@ -1,0 +1,9 @@
+# Snowflake Configuration
+# Copy this file to terraform.tfvars and fill in your actual values
+# terraform.tfvars is gitignored and will not be committed
+
+snowflake_organization_name = "YOUR_ORG_NAME"        # e.g., "MYORG"
+snowflake_account_name      = "YOUR_ACCOUNT_NAME"    # e.g., "XY12345"
+snowflake_username          = "YOUR_ADMIN_USERNAME"  # e.g., "ADMIN"
+snowflake_password          = "YOUR_SECURE_PASSWORD" # Use a strong password
+snowflake_role              = "ACCOUNTADMIN"         # Or your preferred admin role
