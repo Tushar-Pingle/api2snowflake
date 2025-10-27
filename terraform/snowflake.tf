@@ -138,3 +138,13 @@ resource "snowflake_grant_privileges_to_account_role" "airbyte_schema_extras" {
     schema_name = "\"${snowflake_database.US_API_db.name}\".\"${snowflake_schema.raw.name}\""
   }
 }
+
+# Grant USAGE and OPERATE on the database
+resource "snowflake_grant_privileges_to_account_role" "airbyte_db_usage" {
+  account_role_name = snowflake_account_role.airbyte_role.name
+  privileges        = ["USAGE", "OPERATE"]  # Add OPERATE here
+  on_account_object {
+    object_type = "DATABASE"
+    object_name = snowflake_database.US_API_db.name
+  }
+}
