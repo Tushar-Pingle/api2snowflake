@@ -148,3 +148,93 @@ resource "snowflake_grant_privileges_to_account_role" "airbyte_db_create_schema"
     object_name = snowflake_database.US_API_db.name
   }
 }
+# -----------------------------
+# 6️⃣ ACCOUNTADMIN Grants (for dbt and admin access)
+# -----------------------------
+
+# Grant ACCOUNTADMIN all privileges on RAW schema
+resource "snowflake_grant_privileges_to_account_role" "accountadmin_raw_usage" {
+  account_role_name = "ACCOUNTADMIN"
+  privileges        = ["USAGE", "MONITOR", "CREATE TABLE", "CREATE STAGE"]
+  on_schema {
+    schema_name = "\"${snowflake_database.US_API_db.name}\".\"${snowflake_schema.raw.name}\""
+  }
+}
+
+# Grant ACCOUNTADMIN all privileges on existing tables in RAW
+resource "snowflake_grant_privileges_to_account_role" "accountadmin_raw_tables" {
+  account_role_name = "ACCOUNTADMIN"
+  privileges        = ["SELECT", "INSERT", "UPDATE", "DELETE", "TRUNCATE", "REFERENCES"]
+  on_schema_object {
+    all {
+      object_type_plural = "TABLES"
+      in_schema          = "\"${snowflake_database.US_API_db.name}\".\"${snowflake_schema.raw.name}\""
+    }
+  }
+}
+
+# Grant ACCOUNTADMIN privileges on future tables in RAW
+resource "snowflake_grant_privileges_to_account_role" "accountadmin_raw_future_tables" {
+  account_role_name = "ACCOUNTADMIN"
+  privileges        = ["SELECT", "INSERT", "UPDATE", "DELETE", "TRUNCATE", "REFERENCES"]
+  on_schema_object {
+    future {
+      object_type_plural = "TABLES"
+      in_schema          = "\"${snowflake_database.US_API_db.name}\".\"${snowflake_schema.raw.name}\""
+    }
+  }
+}
+
+# Create STAGING schema for dbt
+resource "snowflake_schema" "staging" {
+  database = snowflake_database.US_API_db.name
+  name     = "STAGING"
+  comment  = "Schema for dbt staging models"
+}
+
+# Create MARTS schema for dbt
+resource "snowflake_schema" "marts" {
+  database = snowflake_database.US_API_db.name
+  name     = "MARTS"
+  comment  = "Schema for dbt marts (final analytics tables)"
+}
+
+# Create DBT_DEV schema for development
+resource "snowflake_schema" "dbt_dev" {
+  database = snowflake_database.US_API_db.name
+  name     = "DBT_DEV"
+  comment  = "Schema for dbt development work"
+}
+
+# Grant ACCOUNTADMIN full access to all schemas
+resource "snowflake_grant_privileges_to_account_role" "accountadmin_staging" {
+  account_role_name = "ACCOUNTADMIN"
+  privileges        = ["ALL PRIVILEGES"]
+  on_schema {
+    schema_name = "\"${snowflake_database.US_API_db.name}\".\"${snowflake_schema.staging.name}\""
+  }
+}
+
+resource "snowflake_grant_privileges_to_account_role" "accountadmin_marts" {
+  account_role_name = "ACCOUNTADMIN"
+  privileges        = ["ALL PRIVILEGES"]
+  on_schema {
+    schema_name = "\"${snowflake_database.US_API_db.name}\".\"${snowflake_schema.marts.name}\""
+  }
+}
+
+resource "snowflake_grant_privileges_to_account_role" "accountadmin_dbt_dev" {
+  account_role_name = "ACCOUNTADMIN"
+  privileges        = ["ALL PRIVILEGES"]
+  on_schema {
+    schema_name = "\"${snowflake_database.US_API_db.name}\".\"${snowflake_schema.dbt_dev.name}\""
+  }
+}
+
+resource "snowflake_grant_privileges_to_account_role" "accountadmin_gold" {
+  account_role_name = "ACCOUNTADMIN"
+  privileges        = ["ALL PRIVILEGES"]
+  on_schema {
+    schema_name = "\"${snowflake_database.US_API_db.name}\".\"${snowflake_schema.gold.name}\""
+  }
+}
