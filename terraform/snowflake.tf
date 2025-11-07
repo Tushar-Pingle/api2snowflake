@@ -124,6 +124,16 @@ resource "snowflake_grant_privileges_to_account_role" "airbyte_db_usage" {
   }
 }
 
+# Grant CREATE SCHEMA on database (Airbyte needs this)
+resource "snowflake_grant_privileges_to_account_role" "airbyte_db_create_schema" {
+  account_role_name = snowflake_account_role.airbyte_role.name
+  privileges        = ["CREATE SCHEMA"]
+  on_account_object {
+    object_type = "DATABASE"
+    object_name = snowflake_database.stock_analytics_db.name
+  }
+}
+
 # RAW schema access
 resource "snowflake_grant_privileges_to_account_role" "airbyte_raw_schema" {
   account_role_name = snowflake_account_role.airbyte_role.name
