@@ -1,240 +1,349 @@
 ########################################
-# Snowflake Infrastructure for API Data
+# Stock Analytics Infrastructure
 # Provider: SnowflakeDB/snowflake v2.9.0
+# Purpose: Investment analytics platform with Polygon.io data
 ########################################
 
 # -----------------------------
 # 1️⃣  Database
 # -----------------------------
-resource "snowflake_database" "US_API_db" {
-  name    = "US_API_DATA"
-  comment = "DB to store data ingested from API using Airbyte"
+resource "snowflake_database" "stock_analytics_db" {
+  name    = "STOCK_ANALYTICS"
+  comment = "Database for stock market analytics from Polygon.io"
 }
 
 # -----------------------------
 # 2️⃣  Schemas
 # -----------------------------
 resource "snowflake_schema" "raw" {
-  database = snowflake_database.US_API_db.name
+  database = snowflake_database.stock_analytics_db.name
   name     = "RAW"
-  comment  = "Schema for raw ingested API data"
+  comment  = "Raw data from Airbyte ingestion"
 }
 
-resource "snowflake_schema" "gold" {
-  database = snowflake_database.US_API_db.name
-  name     = "GOLD"
-  comment  = "Schema for transformed data"
+resource "snowflake_schema" "staging" {
+  database = snowflake_database.stock_analytics_db.name
+  name     = "STAGING"
+  comment  = "Staging tables for dbt intermediate transformations"
+}
+
+resource "snowflake_schema" "marts" {
+  database = snowflake_database.stock_analytics_db.name
+  name     = "MARTS"
+  comment  = "Final analytics tables for reporting"
+}
+
+resource "snowflake_schema" "dbt_dev" {
+  database = snowflake_database.stock_analytics_db.name
+  name     = "DBT_DEV"
+  comment  = "Development workspace for dbt"
 }
 
 # -----------------------------
 # 3️⃣  Warehouse
 # -----------------------------
-resource "snowflake_warehouse" "etl_wh" {
-  name                = "ETL_WH"
+resource "snowflake_warehouse" "analytics_wh" {
+  name                = "ANALYTICS_WH"
   warehouse_size      = "XSMALL"
-  auto_suspend        = 60   # suspend after 60s of inactivity
-  auto_resume         = true # automatically start when a query runs
+  auto_suspend        = 60
+  auto_resume         = true
   initially_suspended = true
-  comment             = "Warehouse for API ingestion and transformation jobs"
+  comment             = "Warehouse for analytics workloads"
 }
 
 # -----------------------------
-# 4️⃣  Airbyte Role & User
+# 4️⃣  Service Roles
 # -----------------------------
 
-# Create Airbyte account role
+# Airbyte Role - For data ingestion
 resource "snowflake_account_role" "airbyte_role" {
   name    = "AIRBYTE_ROLE"
-  comment = "Role for Airbyte to write API data in RAW schema"
+  comment = "Role for Airbyte to ingest data from Polygon.io"
 }
 
-# Create Airbyte user
+# dbt Role - For data transformations
+resource "snowflake_account_role" "dbt_role" {
+  name    = "DBT_ROLE"
+  comment = "Role for dbt to transform data"
+}
+
+# Reporting Role - For Power BI (future)
+resource "snowflake_account_role" "reporting_role" {
+  name    = "REPORTING_ROLE"
+  comment = "Read-only role for reporting tools"
+}
+
+# -----------------------------
+# 5️⃣  Service Users
+# -----------------------------
+
+# Airbyte User
 resource "snowflake_user" "airbyte_user" {
   name                 = "AIRBYTE_USER"
-  password             = "Password123456789!" # temporary; rotate later
+  password             = "AirbyteStock2025!" # Change this!
   default_role         = snowflake_account_role.airbyte_role.name
-  default_warehouse    = snowflake_warehouse.etl_wh.name
-  default_namespace    = "${snowflake_database.US_API_db.name}.${snowflake_schema.raw.name}"
+  default_warehouse    = snowflake_warehouse.analytics_wh.name
+  default_namespace    = "${snowflake_database.stock_analytics_db.name}.${snowflake_schema.raw.name}"
   must_change_password = false
-  comment              = "User for Airbyte connection"
+  comment              = "Service account for Airbyte"
 }
 
-# Grant role to user
+# dbt User
+resource "snowflake_user" "dbt_user" {
+  name                 = "DBT_USER"
+  password             = "DbtTransform2025!" # Change this!
+  default_role         = snowflake_account_role.dbt_role.name
+  default_warehouse    = snowflake_warehouse.analytics_wh.name
+  default_namespace    = "${snowflake_database.stock_analytics_db.name}.${snowflake_schema.staging.name}"
+  must_change_password = false
+  comment              = "Service account for dbt"
+}
+
+# Grant roles to users
 resource "snowflake_grant_account_role" "airbyte_user_role" {
   role_name = snowflake_account_role.airbyte_role.name
   user_name = snowflake_user.airbyte_user.name
 }
 
+resource "snowflake_grant_account_role" "dbt_user_role" {
+  role_name = snowflake_account_role.dbt_role.name
+  user_name = snowflake_user.dbt_user.name
+}
+
 # -----------------------------
-# 5️⃣ Grants & Privileges
+# 6️⃣  AIRBYTE_ROLE Permissions
 # -----------------------------
 
-# Grant USAGE on the database
+# Database access
 resource "snowflake_grant_privileges_to_account_role" "airbyte_db_usage" {
   account_role_name = snowflake_account_role.airbyte_role.name
-  privileges        = ["USAGE"]
+  privileges        = ["USAGE", "MONITOR"]
   on_account_object {
     object_type = "DATABASE"
-    object_name = snowflake_database.US_API_db.name
+    object_name = snowflake_database.stock_analytics_db.name
   }
 }
 
-# Grant USAGE and CREATE TABLE on the RAW schema
-resource "snowflake_grant_privileges_to_account_role" "airbyte_schema_usage" {
+# RAW schema access
+resource "snowflake_grant_privileges_to_account_role" "airbyte_raw_schema" {
   account_role_name = snowflake_account_role.airbyte_role.name
-  privileges        = ["USAGE", "CREATE TABLE"]
+  privileges        = ["USAGE", "CREATE TABLE", "CREATE STAGE", "MONITOR"]
   on_schema {
-    schema_name = "\"${snowflake_database.US_API_db.name}\".\"${snowflake_schema.raw.name}\""
+    schema_name = "\"${snowflake_database.stock_analytics_db.name}\".\"${snowflake_schema.raw.name}\""
   }
 }
 
-# Grant USAGE on the warehouse
-resource "snowflake_grant_privileges_to_account_role" "airbyte_wh_usage" {
-  account_role_name = snowflake_account_role.airbyte_role.name
-  privileges        = ["USAGE"]
-  on_account_object {
-    object_type = "WAREHOUSE"
-    object_name = snowflake_warehouse.etl_wh.name
-  }
-}
-
-# Grant future table privileges in RAW schema
-resource "snowflake_grant_privileges_to_account_role" "airbyte_future_tables" {
+# Future tables in RAW
+resource "snowflake_grant_privileges_to_account_role" "airbyte_raw_future_tables" {
   account_role_name = snowflake_account_role.airbyte_role.name
   privileges        = ["SELECT", "INSERT", "UPDATE", "DELETE", "TRUNCATE"]
   on_schema_object {
     future {
       object_type_plural = "TABLES"
-      in_schema          = "\"${snowflake_database.US_API_db.name}\".\"${snowflake_schema.raw.name}\""
+      in_schema          = "\"${snowflake_database.stock_analytics_db.name}\".\"${snowflake_schema.raw.name}\""
     }
   }
 }
 
-# Grant MONITOR privilege on database (needed for connection testing)
-resource "snowflake_grant_privileges_to_account_role" "airbyte_db_monitor" {
+# Warehouse access
+resource "snowflake_grant_privileges_to_account_role" "airbyte_warehouse" {
   account_role_name = snowflake_account_role.airbyte_role.name
-  privileges        = ["MONITOR"]
-  on_account_object {
-    object_type = "DATABASE"
-    object_name = snowflake_database.US_API_db.name
-  }
-}
-
-# Grant MONITOR privilege on warehouse (needed for query execution visibility)
-resource "snowflake_grant_privileges_to_account_role" "airbyte_wh_monitor" {
-  account_role_name = snowflake_account_role.airbyte_role.name
-  privileges        = ["MONITOR", "OPERATE"]
+  privileges        = ["USAGE", "OPERATE", "MONITOR"]
   on_account_object {
     object_type = "WAREHOUSE"
-    object_name = snowflake_warehouse.etl_wh.name
+    object_name = snowflake_warehouse.analytics_wh.name
   }
 }
 
-# Grant MONITOR and CREATE STAGE on schema (Airbyte may need internal stages)
-resource "snowflake_grant_privileges_to_account_role" "airbyte_schema_extras" {
-  account_role_name = snowflake_account_role.airbyte_role.name
-  privileges        = ["MONITOR", "CREATE STAGE"]
-  on_schema {
-    schema_name = "\"${snowflake_database.US_API_db.name}\".\"${snowflake_schema.raw.name}\""
-  }
-}
+# -----------------------------
+# 7️⃣  DBT_ROLE Permissions
+# -----------------------------
 
-# Grant CREATE SCHEMA on database (Airbyte needs this to create tables)
-resource "snowflake_grant_privileges_to_account_role" "airbyte_db_create_schema" {
-  account_role_name = snowflake_account_role.airbyte_role.name
-  privileges        = ["CREATE SCHEMA"]
+# Database access
+resource "snowflake_grant_privileges_to_account_role" "dbt_db_usage" {
+  account_role_name = snowflake_account_role.dbt_role.name
+  privileges        = ["USAGE", "MONITOR"]
   on_account_object {
     object_type = "DATABASE"
-    object_name = snowflake_database.US_API_db.name
+    object_name = snowflake_database.stock_analytics_db.name
   }
 }
-# -----------------------------
-# 6️⃣ ACCOUNTADMIN Grants (for dbt and admin access)
-# -----------------------------
 
-# Grant ACCOUNTADMIN all privileges on RAW schema
-resource "snowflake_grant_privileges_to_account_role" "accountadmin_raw_usage" {
-  account_role_name = "ACCOUNTADMIN"
-  privileges        = ["USAGE", "MONITOR", "CREATE TABLE", "CREATE STAGE"]
+# RAW schema - READ ONLY
+resource "snowflake_grant_privileges_to_account_role" "dbt_raw_schema" {
+  account_role_name = snowflake_account_role.dbt_role.name
+  privileges        = ["USAGE", "MONITOR"]
   on_schema {
-    schema_name = "\"${snowflake_database.US_API_db.name}\".\"${snowflake_schema.raw.name}\""
+    schema_name = "\"${snowflake_database.stock_analytics_db.name}\".\"${snowflake_schema.raw.name}\""
   }
 }
 
-# Grant ACCOUNTADMIN all privileges on existing tables in RAW
-resource "snowflake_grant_privileges_to_account_role" "accountadmin_raw_tables" {
-  account_role_name = "ACCOUNTADMIN"
-  privileges        = ["SELECT", "INSERT", "UPDATE", "DELETE", "TRUNCATE", "REFERENCES"]
+# RAW tables - READ ONLY (existing tables)
+resource "snowflake_grant_privileges_to_account_role" "dbt_raw_tables" {
+  account_role_name = snowflake_account_role.dbt_role.name
+  privileges        = ["SELECT"]
   on_schema_object {
     all {
       object_type_plural = "TABLES"
-      in_schema          = "\"${snowflake_database.US_API_db.name}\".\"${snowflake_schema.raw.name}\""
+      in_schema          = "\"${snowflake_database.stock_analytics_db.name}\".\"${snowflake_schema.raw.name}\""
     }
   }
 }
 
-# Grant ACCOUNTADMIN privileges on future tables in RAW
-resource "snowflake_grant_privileges_to_account_role" "accountadmin_raw_future_tables" {
-  account_role_name = "ACCOUNTADMIN"
+# RAW future tables - READ ONLY
+resource "snowflake_grant_privileges_to_account_role" "dbt_raw_future_tables" {
+  account_role_name = snowflake_account_role.dbt_role.name
+  privileges        = ["SELECT"]
+  on_schema_object {
+    future {
+      object_type_plural = "TABLES"
+      in_schema          = "\"${snowflake_database.stock_analytics_db.name}\".\"${snowflake_schema.raw.name}\""
+    }
+  }
+}
+
+# STAGING schema - FULL ACCESS
+resource "snowflake_grant_privileges_to_account_role" "dbt_staging_schema" {
+  account_role_name = snowflake_account_role.dbt_role.name
+  privileges        = ["USAGE", "CREATE TABLE", "CREATE VIEW", "MONITOR"]
+  on_schema {
+    schema_name = "\"${snowflake_database.stock_analytics_db.name}\".\"${snowflake_schema.staging.name}\""
+  }
+}
+
+# STAGING future tables - FULL ACCESS
+resource "snowflake_grant_privileges_to_account_role" "dbt_staging_future_tables" {
+  account_role_name = snowflake_account_role.dbt_role.name
   privileges        = ["SELECT", "INSERT", "UPDATE", "DELETE", "TRUNCATE", "REFERENCES"]
   on_schema_object {
     future {
       object_type_plural = "TABLES"
-      in_schema          = "\"${snowflake_database.US_API_db.name}\".\"${snowflake_schema.raw.name}\""
+      in_schema          = "\"${snowflake_database.stock_analytics_db.name}\".\"${snowflake_schema.staging.name}\""
     }
   }
 }
 
-# Create STAGING schema for dbt
-resource "snowflake_schema" "staging" {
-  database = snowflake_database.US_API_db.name
-  name     = "STAGING"
-  comment  = "Schema for dbt staging models"
-}
-
-# Create MARTS schema for dbt
-resource "snowflake_schema" "marts" {
-  database = snowflake_database.US_API_db.name
-  name     = "MARTS"
-  comment  = "Schema for dbt marts (final analytics tables)"
-}
-
-# Create DBT_DEV schema for development
-resource "snowflake_schema" "dbt_dev" {
-  database = snowflake_database.US_API_db.name
-  name     = "DBT_DEV"
-  comment  = "Schema for dbt development work"
-}
-
-# Grant ACCOUNTADMIN full access to all schemas
-resource "snowflake_grant_privileges_to_account_role" "accountadmin_staging" {
-  account_role_name = "ACCOUNTADMIN"
-  privileges        = ["ALL PRIVILEGES"]
-  on_schema {
-    schema_name = "\"${snowflake_database.US_API_db.name}\".\"${snowflake_schema.staging.name}\""
+# STAGING future views - FULL ACCESS
+resource "snowflake_grant_privileges_to_account_role" "dbt_staging_future_views" {
+  account_role_name = snowflake_account_role.dbt_role.name
+  privileges        = ["SELECT"]
+  on_schema_object {
+    future {
+      object_type_plural = "VIEWS"
+      in_schema          = "\"${snowflake_database.stock_analytics_db.name}\".\"${snowflake_schema.staging.name}\""
+    }
   }
 }
 
-resource "snowflake_grant_privileges_to_account_role" "accountadmin_marts" {
-  account_role_name = "ACCOUNTADMIN"
-  privileges        = ["ALL PRIVILEGES"]
+# MARTS schema - FULL ACCESS
+resource "snowflake_grant_privileges_to_account_role" "dbt_marts_schema" {
+  account_role_name = snowflake_account_role.dbt_role.name
+  privileges        = ["USAGE", "CREATE TABLE", "CREATE VIEW", "MONITOR"]
   on_schema {
-    schema_name = "\"${snowflake_database.US_API_db.name}\".\"${snowflake_schema.marts.name}\""
+    schema_name = "\"${snowflake_database.stock_analytics_db.name}\".\"${snowflake_schema.marts.name}\""
   }
 }
 
-resource "snowflake_grant_privileges_to_account_role" "accountadmin_dbt_dev" {
-  account_role_name = "ACCOUNTADMIN"
-  privileges        = ["ALL PRIVILEGES"]
-  on_schema {
-    schema_name = "\"${snowflake_database.US_API_db.name}\".\"${snowflake_schema.dbt_dev.name}\""
+# MARTS future tables - FULL ACCESS
+resource "snowflake_grant_privileges_to_account_role" "dbt_marts_future_tables" {
+  account_role_name = snowflake_account_role.dbt_role.name
+  privileges        = ["SELECT", "INSERT", "UPDATE", "DELETE", "TRUNCATE", "REFERENCES"]
+  on_schema_object {
+    future {
+      object_type_plural = "TABLES"
+      in_schema          = "\"${snowflake_database.stock_analytics_db.name}\".\"${snowflake_schema.marts.name}\""
+    }
   }
 }
 
-resource "snowflake_grant_privileges_to_account_role" "accountadmin_gold" {
+# MARTS future views - FULL ACCESS
+resource "snowflake_grant_privileges_to_account_role" "dbt_marts_future_views" {
+  account_role_name = snowflake_account_role.dbt_role.name
+  privileges        = ["SELECT"]
+  on_schema_object {
+    future {
+      object_type_plural = "VIEWS"
+      in_schema          = "\"${snowflake_database.stock_analytics_db.name}\".\"${snowflake_schema.marts.name}\""
+    }
+  }
+}
+
+# DBT_DEV schema - FULL ACCESS
+resource "snowflake_grant_privileges_to_account_role" "dbt_dev_schema" {
+  account_role_name = snowflake_account_role.dbt_role.name
+  privileges        = ["ALL PRIVILEGES"]
+  on_schema {
+    schema_name = "\"${snowflake_database.stock_analytics_db.name}\".\"${snowflake_schema.dbt_dev.name}\""
+  }
+}
+
+# Warehouse access for dbt
+resource "snowflake_grant_privileges_to_account_role" "dbt_warehouse" {
+  account_role_name = snowflake_account_role.dbt_role.name
+  privileges        = ["USAGE", "OPERATE", "MONITOR"]
+  on_account_object {
+    object_type = "WAREHOUSE"
+    object_name = snowflake_warehouse.analytics_wh.name
+  }
+}
+
+# -----------------------------
+# 8️⃣  ACCOUNTADMIN Access (You)
+# -----------------------------
+
+# Grant ACCOUNTADMIN read access to all schemas
+resource "snowflake_grant_privileges_to_account_role" "admin_raw" {
   account_role_name = "ACCOUNTADMIN"
   privileges        = ["ALL PRIVILEGES"]
   on_schema {
-    schema_name = "\"${snowflake_database.US_API_db.name}\".\"${snowflake_schema.gold.name}\""
+    schema_name = "\"${snowflake_database.stock_analytics_db.name}\".\"${snowflake_schema.raw.name}\""
+  }
+}
+
+resource "snowflake_grant_privileges_to_account_role" "admin_staging" {
+  account_role_name = "ACCOUNTADMIN"
+  privileges        = ["ALL PRIVILEGES"]
+  on_schema {
+    schema_name = "\"${snowflake_database.stock_analytics_db.name}\".\"${snowflake_schema.staging.name}\""
+  }
+}
+
+resource "snowflake_grant_privileges_to_account_role" "admin_marts" {
+  account_role_name = "ACCOUNTADMIN"
+  privileges        = ["ALL PRIVILEGES"]
+  on_schema {
+    schema_name = "\"${snowflake_database.stock_analytics_db.name}\".\"${snowflake_schema.marts.name}\""
+  }
+}
+
+resource "snowflake_grant_privileges_to_account_role" "admin_dbt_dev" {
+  account_role_name = "ACCOUNTADMIN"
+  privileges        = ["ALL PRIVILEGES"]
+  on_schema {
+    schema_name = "\"${snowflake_database.stock_analytics_db.name}\".\"${snowflake_schema.dbt_dev.name}\""
+  }
+}
+
+# ACCOUNTADMIN access to all current tables in RAW
+resource "snowflake_grant_privileges_to_account_role" "admin_raw_tables" {
+  account_role_name = "ACCOUNTADMIN"
+  privileges        = ["ALL PRIVILEGES"]
+  on_schema_object {
+    all {
+      object_type_plural = "TABLES"
+      in_schema          = "\"${snowflake_database.stock_analytics_db.name}\".\"${snowflake_schema.raw.name}\""
+    }
+  }
+}
+
+# ACCOUNTADMIN access to all future tables in RAW
+resource "snowflake_grant_privileges_to_account_role" "admin_raw_future_tables" {
+  account_role_name = "ACCOUNTADMIN"
+  privileges        = ["ALL PRIVILEGES"]
+  on_schema_object {
+    future {
+      object_type_plural = "TABLES"
+      in_schema          = "\"${snowflake_database.stock_analytics_db.name}\".\"${snowflake_schema.raw.name}\""
+    }
   }
 }
