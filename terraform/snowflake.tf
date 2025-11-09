@@ -262,3 +262,34 @@ resource "snowflake_grant_privileges_to_account_role" "admin_dbt_dev_future_view
     }
   }
 }
+
+# ACCOUNTADMIN access to RAW schema and tables
+resource "snowflake_grant_privileges_to_account_role" "admin_raw_schema" {
+  account_role_name = "ACCOUNTADMIN"
+  privileges        = ["ALL PRIVILEGES"]
+  on_schema {
+    schema_name = "\"${snowflake_database.stock_analytics_db.name}\".\"${snowflake_schema.raw.name}\""
+  }
+}
+
+resource "snowflake_grant_privileges_to_account_role" "admin_raw_tables" {
+  account_role_name = "ACCOUNTADMIN"
+  privileges        = ["ALL PRIVILEGES"]
+  on_schema_object {
+    all {
+      object_type_plural = "TABLES"
+      in_schema          = "\"${snowflake_database.stock_analytics_db.name}\".\"${snowflake_schema.raw.name}\""
+    }
+  }
+}
+
+resource "snowflake_grant_privileges_to_account_role" "admin_raw_future_tables" {
+  account_role_name = "ACCOUNTADMIN"
+  privileges        = ["ALL PRIVILEGES"]
+  on_schema_object {
+    future {
+      object_type_plural = "TABLES"
+      in_schema          = "\"${snowflake_database.stock_analytics_db.name}\".\"${snowflake_schema.raw.name}\""
+    }
+  }
+}
