@@ -1,0 +1,52 @@
+version: 2
+
+sources:
+  - name: raw_stock_data
+    description: Raw  stock price data from polygon.io via airbyte
+    database: STOCK_ANALYTICS
+    schema: RAW
+    tables:
+      - name: AAPL_STOCK_API
+        description: Apple (AAPL) stock data
+        meta:
+          ticker: AAPL
+
+      - name: MSFT_STOCK_API
+        description: Microsoft (MSFT) stock data
+        meta:
+          ticker: MSFT
+
+      - name: AMZN_STOCK_API
+        description: Amazon (AMZN) stock data
+        meta:
+          ticker: AMZN
+
+      - name: GOOGL_STOCK_API
+        description: GOOGLE (GOOGL) stock data
+        meta:
+          ticker: GOOGL
+
+      - name: META_STOCK_API
+        description: META (META) stock data
+        meta:
+          ticker: META
+
+      - name: NVDA_STOCK_API
+        description: NVIDIA (NVDA) stock data
+        meta:
+          ticker: NVDA
+
+      - name: QQQ_STOCK_API
+        description: NASDAQ 100 EFT (QQQ) stock data
+        meta:
+          ticker: QQQ
+
+      - name: SPY_STOCK_API
+        description: S&P 500 (SPY) stock data
+        meta:
+          ticker: SPY
+
+      - name: TSLA_STOCK_API
+        description: TESLA (TSLA) stock data
+        meta:
+          ticker: TSLA
