@@ -221,6 +221,78 @@ resource "snowflake_grant_privileges_to_account_role" "dbt_staging_schema" {
   }
 }
 
+# STAGING existing tables - FULL ACCESS
+resource "snowflake_grant_privileges_to_account_role" "dbt_staging_existing_tables" {
+  account_role_name = snowflake_account_role.dbt_role.name
+  privileges        = ["SELECT", "INSERT", "UPDATE", "DELETE", "TRUNCATE", "REFERENCES"]
+  on_schema_object {
+    all {
+      object_type_plural = "TABLES"
+      in_schema          = "\"${snowflake_database.stock_analytics_db.name}\".\"${snowflake_schema.staging.name}\""
+    }
+  }
+}
+
+# STAGING existing views - FULL ACCESS
+resource "snowflake_grant_privileges_to_account_role" "dbt_staging_existing_views" {
+  account_role_name = snowflake_account_role.dbt_role.name
+  privileges        = ["SELECT"]
+  on_schema_object {
+    all {
+      object_type_plural = "VIEWS"
+      in_schema          = "\"${snowflake_database.stock_analytics_db.name}\".\"${snowflake_schema.staging.name}\""
+    }
+  }
+}
+
+# MARTS existing tables - FULL ACCESS
+resource "snowflake_grant_privileges_to_account_role" "dbt_marts_existing_tables" {
+  account_role_name = snowflake_account_role.dbt_role.name
+  privileges        = ["SELECT", "INSERT", "UPDATE", "DELETE", "TRUNCATE", "REFERENCES"]
+  on_schema_object {
+    all {
+      object_type_plural = "TABLES"
+      in_schema          = "\"${snowflake_database.stock_analytics_db.name}\".\"${snowflake_schema.marts.name}\""
+    }
+  }
+}
+
+# MARTS existing views - FULL ACCESS
+resource "snowflake_grant_privileges_to_account_role" "dbt_marts_existing_views" {
+  account_role_name = snowflake_account_role.dbt_role.name
+  privileges        = ["SELECT"]
+  on_schema_object {
+    all {
+      object_type_plural = "VIEWS"
+      in_schema          = "\"${snowflake_database.stock_analytics_db.name}\".\"${snowflake_schema.marts.name}\""
+    }
+  }
+}
+
+# DBT_DEV existing tables - FULL ACCESS
+resource "snowflake_grant_privileges_to_account_role" "dbt_dev_existing_tables" {
+  account_role_name = snowflake_account_role.dbt_role.name
+  privileges        = ["SELECT", "INSERT", "UPDATE", "DELETE", "TRUNCATE", "REFERENCES"]
+  on_schema_object {
+    all {
+      object_type_plural = "TABLES"
+      in_schema          = "\"${snowflake_database.stock_analytics_db.name}\".\"${snowflake_schema.dbt_dev.name}\""
+    }
+  }
+}
+
+# DBT_DEV existing views - FULL ACCESS
+resource "snowflake_grant_privileges_to_account_role" "dbt_dev_existing_views" {
+  account_role_name = snowflake_account_role.dbt_role.name
+  privileges        = ["SELECT"]
+  on_schema_object {
+    all {
+      object_type_plural = "VIEWS"
+      in_schema          = "\"${snowflake_database.stock_analytics_db.name}\".\"${snowflake_schema.dbt_dev.name}\""
+    }
+  }
+}
+
 # STAGING future tables - FULL ACCESS
 resource "snowflake_grant_privileges_to_account_role" "dbt_staging_future_tables" {
   account_role_name = snowflake_account_role.dbt_role.name
