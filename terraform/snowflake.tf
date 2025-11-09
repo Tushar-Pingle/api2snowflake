@@ -239,3 +239,26 @@ resource "snowflake_grant_privileges_to_account_role" "admin_db" {
     object_name = snowflake_database.stock_analytics_db.name
   }
 }
+
+# ACCOUNTADMIN access to DBT_DEV views
+resource "snowflake_grant_privileges_to_account_role" "admin_dbt_dev_views" {
+  account_role_name = "ACCOUNTADMIN"
+  privileges        = ["SELECT"]
+  on_schema_object {
+    all {
+      object_type_plural = "VIEWS"
+      in_schema          = "\"${snowflake_database.stock_analytics_db.name}\".\"${snowflake_schema.dbt_dev.name}\""
+    }
+  }
+}
+
+resource "snowflake_grant_privileges_to_account_role" "admin_dbt_dev_future_views" {
+  account_role_name = "ACCOUNTADMIN"
+  privileges        = ["SELECT"]
+  on_schema_object {
+    future {
+      object_type_plural = "VIEWS"
+      in_schema          = "\"${snowflake_database.stock_analytics_db.name}\".\"${snowflake_schema.dbt_dev.name}\""
+    }
+  }
+}
