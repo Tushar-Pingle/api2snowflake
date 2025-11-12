@@ -24,22 +24,31 @@ clean-targets:         # directories to be removed by `dbt clean`
 # Configuring models
 # Full documentation: https://docs.getdbt.com/docs/configuring-models
 
+# Configuring models
+# Full documentation: https://docs.getdbt.com/docs/configuring-models
+
 models:
   stock_analytics:
     # Staging models - clean and standardize raw data
     staging:
+      +schema: staging
       +materialized: view
 
     # Intermediate models - business logic and calculations
     intermediate:
+      +schema: staging  # Keep intermediate in staging
       +materialized: view
 
     # Marts - final analytics-ready tables
     marts:
+      +schema: marts
       +materialized: table
       dimensions:
+        +schema: marts
         +materialized: table
       facts:
+        +schema: marts
         +materialized: table
       analytics:
+        +schema: marts
         +materialized: table
